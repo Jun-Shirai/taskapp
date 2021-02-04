@@ -20,7 +20,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate,UNUserNotificationCenterDe
         let center = UNUserNotificationCenter.current()
         center.requestAuthorization(options: [.alert,.sound]) {
             (granted, error) in
-        }　//ーーここまでーー
+        } //ーーここまでーー
         center.delegate = self //追加
         
         return true

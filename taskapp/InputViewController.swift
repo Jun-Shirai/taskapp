@@ -14,6 +14,7 @@ class InputViewController: UIViewController {
     @IBOutlet weak var titleTextField: UITextField!
     @IBOutlet weak var contentsTextView: UITextView!
     @IBOutlet weak var datePicker: UIDatePicker!
+    @IBOutlet weak var categoryTextField: UITextField!  //カテゴリー追加のため
     
     //プロパティ
     let realm = try! Realm()  //追加する
@@ -26,33 +27,41 @@ class InputViewController: UIViewController {
         // Do any additional setup after loading the view.
         
         //背景をタップしたらdismissKeyboardを呼ぶように設定する
+        //タップしたときに動作するようターゲット（InputViewController）とメソッド（dismissKeyboard）を指定
+        //背景にこのUI部品を登録するために、tapGestureと値を設定
         let tapGesture: UITapGestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
+        //背景はviewプロパティに該当するため、これに登録
         self.view.addGestureRecognizer(tapGesture)
         
         titleTextField.text = task.title
         contentsTextView.text = task.contents
+        categoryTextField.text = task.category
         datePicker.date = task.date
     }
-    
+    //上記によって呼び出される関数
     @objc func dismissKeyboard() {
         //キーボードを閉じる
         view.endEditing(true)
     }
-    //追加する。遷移するときに画面が非表示になる
+    //追加する。遷移に伴い画面が非表示になるときに呼ばれる動作・メソッド
     override func viewWillDisappear(_ animated: Bool) {
         try! realm.write {
             self.task.title = self.titleTextField.text!
             self.task.contents = self.contentsTextView.text
             self.task.date = self.datePicker.date
+            self.task.category = self.categoryTextField.text! //カテゴリー追加のため
             self.realm.add(self.task,update: .modified)
         }
-        setNotification(task: task) //追加する。ローカル通知の登録のため
+        setNotification(task: task)
+        //↑ローカル通知の設定
+        //タスク作成・編集画面から一覧への戻り、データベースにタスクを保存するタイミングでローカル通知の設定もあわせてする
         
         super.viewWillDisappear(animated)
     }
     
-    //タスクのローカル通知を登録する。ーーここからーー
+    //上記の動作を下記に設定しタスクのローカル通知を登録する。ーーここからーー
     func setNotification(task: Task) {
+        //タイトルや内容を設定するためのインスタンスを生成
         let content = UNMutableNotificationContent()
         //タイトルと内容を設定（中身がない場合メッセージなしで音だけの通知になるので「xxなし」を表示する）
         if task.title == "" {
@@ -73,16 +82,17 @@ class InputViewController: UIViewController {
     let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: false)
     
     //identifier,content,triggerからローカル通知を作成（identifierが同じだとローカル通知を上書き保存）
+    //このidentifi/Users/shiraiatsushi/Documents/taskapp/taskapp/Assets.xcassetserはsegueのものではない
     let request = UNNotificationRequest(identifier: String(task.id), content: content, trigger: trigger)
     
     //ローカル通知を登録
     let center = UNUserNotificationCenter.current()
         center.add(request) {(error) in
-        print(error ?? "ローカリ通知登録　OK")
+        print(error ?? "ローカル通知登録　OK")
     //errorがnilならローカル通知の登録に成功したと表示する。errorが存在すればerrorと表示する。
     }
     
-    //未通知のローカル通知一覧をログ出力
+    //未通知のローカル通知一覧をログ出力＊get pending：保留中　という意味
     center.getPendingNotificationRequests {(requests: [UNNotificationRequest]) in
         for request in requests {
             print("/-------------")
