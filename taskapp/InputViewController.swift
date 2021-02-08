@@ -9,22 +9,30 @@ import UIKit
 import RealmSwift //追加する
 import UserNotifications//追加する。ローカル通知の登録のため
 
-class InputViewController: UIViewController {
+class InputViewController: UIViewController,UITableViewDelegate,UITableViewDataSource {
     
     @IBOutlet weak var titleTextField: UITextField!
     @IBOutlet weak var contentsTextView: UITextView!
     @IBOutlet weak var datePicker: UIDatePicker!
     @IBOutlet weak var categoryTextField: UITextField!  //カテゴリー追加のため
+    @IBOutlet weak var tableView: UITableView!  //カテゴリー選択一覧
+    
+  //TaskとCategoryを繋ぐ処理をしよう
     
     //プロパティ
     let realm = try! Realm()  //追加する
     var task: Task! //追加する
+    var categoryArray = try! Realm().objects(Category.self) //Categoryクラスを引っ張ってきてリスト生成
     
     
     override func viewDidLoad() {
         super.viewDidLoad()
 
         // Do any additional setup after loading the view.
+        //デリゲート指定
+        tableView.delegate = self
+        tableView.dataSource = self
+        
         
         //背景をタップしたらdismissKeyboardを呼ぶように設定する
         //タップしたときに動作するようターゲット（InputViewController）とメソッド（dismissKeyboard）を指定
@@ -43,6 +51,67 @@ class InputViewController: UIViewController {
         //キーボードを閉じる
         view.endEditing(true)
     }
+    
+//カテゴリー：データ（セル）の数を返すメソッド
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        return categoryArray.count
+    }
+    //各セルの内容を返すメソッド
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        //再利用可能なセルへ
+        let cell = tableView.dequeueReusableCell(withIdentifier: "Cell", for: indexPath)
+        //Cellの値を設定
+        let itemcategory = categoryArray[indexPath.row]
+        cell.textLabel?.text = itemcategory.item
+        
+        return cell
+    }
+    
+    //各セルを(InputVieaControllerより)選択したときに実行されるメソッド：遷移
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        //セグエのidentifierに名前つけて指定しよう
+        performSegue(withIdentifier: "inputcellSegue", sender: nil)
+    }
+    
+    //セルの削除が可能なことを伝えるメソッド
+    func tableView(_ tableView: UITableView, editingStyleForRowAt indexPath: IndexPath) -> UITableViewCell.EditingStyle {
+        return.delete
+    }
+    //Deleteボタンが押されたときに呼び出されるメソッド
+    func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
+        if editingStyle == .delete {
+            //削除するタスクを取得
+            let item = self.categoryArray[indexPath.row]
+            //データベースから削除
+            try! realm.write {
+                self.realm.delete(self.categoryArray[indexPath.row])
+                tableView.deleteRows(at: [indexPath], with: .fade)
+            }
+        }
+    }
+    
+    //segueでタスク作成画面からカテゴリ作成画面へ遷移する時に呼ばれる
+    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+        //itemViewControllerを取得
+        let itemViewController: ItemViewController = segue.destination as! ItemViewController
+        
+        //セルをタップしたときに作成済みのカテゴリ一覧から該当するCategoryクラスのインスタンスを取得していく
+        if segue.identifier == "inputcellSegue" {
+            let indexPath = self.tableView.indexPathForSelectedRow
+            itemViewController.item = categoryArray[indexPath!.row]  //渡す値
+        }else {
+            //「新規作成」をタップしたときに新たなインスタンスの生成とidの設定をする
+            let item = Category()
+            
+            let allitems = realm.objects(Category.self)
+            if allitems.count != 0 {
+                item.id = allitems.max(ofProperty: "id")! + 1
+                itemViewController.item = item //渡す値
+            }
+        }
+    }
+    
+    
     //追加する。遷移に伴い画面が非表示になるときに呼ばれる動作・メソッド
     override func viewWillDisappear(_ animated: Bool) {
         try! realm.write {

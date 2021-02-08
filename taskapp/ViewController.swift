@@ -14,7 +14,7 @@ class ViewController: UIViewController,UITableViewDelegate,UITableViewDataSource
     @IBOutlet weak var tableView: UITableView!
     @IBOutlet weak var searchbar: UISearchBar!
     //↑サーチバー接続
-    
+        
     //Realmインスタンスを取得する。これを使ってメソッドを呼び出す。
     let realm = try! Realm() //<-追加
     
@@ -68,15 +68,16 @@ class ViewController: UIViewController,UITableViewDelegate,UITableViewDataSource
             
             //件数が０のとき
         if (count == 0) {
-            //タスクを全て表示
-            taskArray = realm.objects(Task.self)
+            //全てのタスク表示
+           
         }else {
             //上記以外、つまりヒットしたタスクがある場合はそれを表示
             taskArray = results
             
+        }
             tableView.reloadData()  //タスク一覧の再読み込み
         }
-        }
+        
     }
     
     
