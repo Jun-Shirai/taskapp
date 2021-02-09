@@ -43,7 +43,7 @@ class ItemViewController: UIViewController {
             self.item.item = self.itemTextField.text!
             self.realm.add(self.item,update: .modified)
         }
-        super.viewWillDisappear(animated)
+        super.viewWillDisappear(animated)  //作成したものを保存する
     }
     
 

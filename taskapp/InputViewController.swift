@@ -6,23 +6,23 @@
 //
 
 import UIKit
-import RealmSwift //追加する
-import UserNotifications//追加する。ローカル通知の登録のため
+import RealmSwift
+import UserNotifications//ローカル通知の登録のため
 
-class InputViewController: UIViewController,UITableViewDelegate,UITableViewDataSource {
+class InputViewController: UIViewController,UITableViewDelegate,UITableViewDataSource,UIPickerViewDelegate,UIPickerViewDataSource {
     
     @IBOutlet weak var titleTextField: UITextField!
     @IBOutlet weak var contentsTextView: UITextView!
     @IBOutlet weak var datePicker: UIDatePicker!
-    @IBOutlet weak var categoryTextField: UITextField!  //カテゴリー追加のため
-    @IBOutlet weak var tableView: UITableView!  //カテゴリー選択一覧
-    
-  //TaskとCategoryを繋ぐ処理をしよう
+    @IBOutlet weak var categoryTextField: UITextField!  //カテゴリテキスト用
+    @IBOutlet weak var tableView: UITableView!  //カテゴリ選択一覧用
     
     //プロパティ
-    let realm = try! Realm()  //追加する
-    var task: Task! //追加する
+    let realm = try! Realm()
+    var task: Task!
     var categoryArray = try! Realm().objects(Category.self) //Categoryクラスを引っ張ってきてリスト生成
+    
+    var pickerView = UIPickerView()  //ピッカービューのインスタンスを取得
     
     
     override func viewDidLoad() {
@@ -45,11 +45,50 @@ class InputViewController: UIViewController,UITableViewDelegate,UITableViewDataS
         contentsTextView.text = task.contents
         categoryTextField.text = task.category
         datePicker.date = task.date
+        
+        //ピッカービューのデリゲート指定
+        pickerView.delegate = self
+        pickerView.dataSource = self
+        
+        categoryTextField.inputView = pickerView
+        
+        let toolbar = UIToolbar()
+        toolbar.frame = CGRect(x: 0, y: 0, width: self.view.frame.width, height: 44)
+        let doneButtonItem = UIBarButtonItem(barButtonSystemItem: .done, target: self, action: #selector(donePicker))
+        toolbar.setItems([doneButtonItem], animated: true)
+        categoryTextField.inputAccessoryView = toolbar
     }
-    //上記によって呼び出される関数
+    //キーボードを閉じる関数
     @objc func dismissKeyboard() {
         //キーボードを閉じる
         view.endEditing(true)
+    }
+    
+    //ツールバーを閉じる関数
+    @objc func donePicker() {
+        categoryTextField.endEditing(true)
+    }
+    
+//UIPickerViewのデリゲートメソッドなどを記述
+    //表示する列数
+    func numberOfComponents(in pickerView: UIPickerView) -> Int {
+        return 1
+    }
+    //表示するデータの数
+    func pickerView(_ pickerView: UIPickerView, numberOfRowsInComponent component: Int) -> Int {
+        return categoryArray.count
+    }
+    //表示するデータの登録
+    func pickerView(_ pickerView: UIPickerView, titleForRow row: Int, forComponent component: Int) -> String? {
+        return categoryArray[row].item
+    }
+    //データが選択されたときに呼ばれるメソッド
+    func pickerView(_ pickerView: UIPickerView, didSelectRow row: Int, inComponent component: Int) {
+        categoryTextField.text = categoryArray[row].item
+    }
+    
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        categoryTextField.endEditing(true)
     }
     
 //カテゴリー：データ（セル）の数を返すメソッド
@@ -59,7 +98,7 @@ class InputViewController: UIViewController,UITableViewDelegate,UITableViewDataS
     //各セルの内容を返すメソッド
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         //再利用可能なセルへ
-        let cell = tableView.dequeueReusableCell(withIdentifier: "Cell", for: indexPath)
+        let cell = tableView.dequeueReusableCell(withIdentifier: "ReuseCell", for: indexPath)
         //Cellの値を設定
         let itemcategory = categoryArray[indexPath.row]
         cell.textLabel?.text = itemcategory.item
@@ -80,9 +119,8 @@ class InputViewController: UIViewController,UITableViewDelegate,UITableViewDataS
     //Deleteボタンが押されたときに呼び出されるメソッド
     func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
         if editingStyle == .delete {
-            //削除するタスクを取得
-            let item = self.categoryArray[indexPath.row]
-            //データベースから削除
+            
+            //データベースからタスクを削除
             try! realm.write {
                 self.realm.delete(self.categoryArray[indexPath.row])
                 tableView.deleteRows(at: [indexPath], with: .fade)
@@ -106,9 +144,15 @@ class InputViewController: UIViewController,UITableViewDelegate,UITableViewDataS
             let allitems = realm.objects(Category.self)
             if allitems.count != 0 {
                 item.id = allitems.max(ofProperty: "id")! + 1
-                itemViewController.item = item //渡す値
+                
             }
+            itemViewController.item = item //渡す値
         }
+    }
+    //カテゴリ作成画面からもどってきたときにTableViewを更新させる
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        tableView.reloadData()
     }
     
     
@@ -125,10 +169,10 @@ class InputViewController: UIViewController,UITableViewDelegate,UITableViewDataS
         //↑ローカル通知の設定
         //タスク作成・編集画面から一覧への戻り、データベースにタスクを保存するタイミングでローカル通知の設定もあわせてする
         
-        super.viewWillDisappear(animated)
+        super.viewWillDisappear(animated)  //作成したものを保存する
     }
     
-    //上記の動作を下記に設定しタスクのローカル通知を登録する。ーーここからーー
+    //上記の動作を下記に設定しタスクのローカル通知を登録する。
     func setNotification(task: Task) {
         //タイトルや内容を設定するためのインスタンスを生成
         let content = UNMutableNotificationContent()
@@ -171,7 +215,7 @@ class InputViewController: UIViewController,UITableViewDelegate,UITableViewDataS
         }
         
     }
-}//ーーここまで追加ーー
+}
     
     /*
     // MARK: - Navigation

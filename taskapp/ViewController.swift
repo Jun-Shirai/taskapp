@@ -6,17 +6,17 @@
 //
 
 import UIKit
-import RealmSwift //<-追加。Realmのデータベース準備するため。
-import UserNotifications //<-追加する。タスク削除のときに通知キャンセルをするために
+import RealmSwift //Realmのデータベース準備するため。
+import UserNotifications //タスク削除のときに通知キャンセルをするために
 
-class ViewController: UIViewController,UITableViewDelegate,UITableViewDataSource,UISearchBarDelegate{
- //↑サーチバー用に機能追加
+class ViewController: UIViewController,UITableViewDelegate,UITableViewDataSource,UISearchBarDelegate,UIPickerViewDelegate,UIPickerViewDataSource {
+ 
     @IBOutlet weak var tableView: UITableView!
     @IBOutlet weak var searchbar: UISearchBar!
-    //↑サーチバー接続
-        
+    @IBOutlet weak var textField: UITextField!
+    
     //Realmインスタンスを取得する。これを使ってメソッドを呼び出す。
-    let realm = try! Realm() //<-追加
+    let realm = try! Realm()
     
     //DB内のタスクが格納されるリスト。「Task」はTask.swiftからのもの。
     //日付の近い順でソート：昇順
@@ -24,6 +24,8 @@ class ViewController: UIViewController,UITableViewDelegate,UITableViewDataSource
     var taskArray = try! Realm().objects(Task.self).sorted(byKeyPath: "date", ascending: true)
     //↑追加。これでデータベースの準備ができた。
     
+    var pickerTextView = UIPickerView()  //ピッカービューのインスタンスを取得
+    var categoryArray = try! Realm().objects(Category.self)  //ピッカーのためにCategoryクラスを引っ張ってくる
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -36,9 +38,77 @@ class ViewController: UIViewController,UITableViewDelegate,UITableViewDataSource
         //入力なしでもリターンキーが押せるようにする
         searchbar.enablesReturnKeyAutomatically = false
         
+        //ピッカービューのデリゲート指定
+        pickerTextView.delegate = self
+        pickerTextView.dataSource = self
+        
+        textField.inputView = pickerTextView  //テキストとピッカーをつなげる
+        
+        //ツールバーの位置と選択後の閉じる動作
+        let texttoolbar = UIToolbar()
+        texttoolbar.frame = CGRect(x: 0, y: 0, width: self.view.frame.width, height: 44)
+        let doneButton = UIBarButtonItem(barButtonSystemItem: .done, target: self, action: #selector(endPicker))
+        texttoolbar.setItems([doneButton], animated: true)
+        textField.inputAccessoryView = texttoolbar
         
     }
     
+    //ツールバーを閉じる関数
+    @objc func endPicker() {
+        textField.endEditing(true)
+    }
+    
+//ピッカービューで検索するパターン（デリゲートメソッドを記述）
+    //表示する列数
+    func numberOfComponents(in pickerView: UIPickerView) -> Int {
+        return 1
+    }
+    //表示するデータの数
+    func pickerView(_ pickerView: UIPickerView, numberOfRowsInComponent component: Int) -> Int {
+        return categoryArray.count
+    }
+    //表示するデータの登録
+    func pickerView(_ pickerView: UIPickerView, titleForRow row: Int, forComponent component: Int) -> String? {
+        return categoryArray[row].item
+    }
+    //データが選択されたときに呼ばれるメソッド
+    func pickerView(_ pickerView: UIPickerView, didSelectRow row: Int, inComponent component: Int) {
+        textField.text = categoryArray[row].item
+    }
+    
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        textField.endEditing(true)
+    }
+    
+    //検索ボタンが押された時の場合分け
+    @IBAction func searchButton(_ sender: Any) {
+        let searchCategoryText: String = textField.text!
+        
+        //テキスが空欄のときはタスク全て表示
+        if (textField.text! == "") {
+            taskArray = realm.objects(Task.self)
+            tableView.reloadData()  //タスク表示の更新
+        }else {
+            
+            //テキストに入力があるときは一致するものを検索
+            let predicate = NSPredicate(format: "category == %@", "\(searchCategoryText)")
+            let results = realm.objects(Task.self).filter(predicate)
+            
+            //検索件数
+            let categorycount = results.count
+            //０のとき
+            if (categorycount == 0) {
+                //全てのタスクを表示
+            }else {
+                //ヒットしたときは一致するものを表示
+                taskArray = results
+            }
+            tableView.reloadData()  //タスク表示の更新
+        }
+    }
+    
+    
+//サーチバーに文字列を入力して検索するパターン
     //検索ボタン押したときに呼び出される
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
         searchbar.endEditing(true)
@@ -83,7 +153,7 @@ class ViewController: UIViewController,UITableViewDelegate,UITableViewDataSource
     
     //データ（セル）の数を返すメソッド
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return taskArray.count //←修正
+        return taskArray.count //←全てのタスク
     }
     //各セルの内容を返すメソッド
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -113,7 +183,7 @@ class ViewController: UIViewController,UITableViewDelegate,UITableViewDataSource
     }
     //Deleteボタンが押されたときに呼ばれるメソッド
     func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
-        //ーーここから追加ーー
+        
         if editingStyle == .delete {
             //削除するタスクを取得する
             let task = self.taskArray[indexPath.row]
@@ -133,7 +203,7 @@ class ViewController: UIViewController,UITableViewDelegate,UITableViewDataSource
                     print("--------------/")
                 }
             }
-        }//ーーここまで追加・変更ーー
+        }
     }
 
     //segueでタスク一覧からタスク作成・編集画面へ遷移するときに呼ばれる
@@ -159,7 +229,7 @@ class ViewController: UIViewController,UITableViewDelegate,UITableViewDataSource
             inputViewController.task = task  //渡す値
         }
     }
-    //入力（作成・編集）画面から戻ってきたときにTableViewを更新させる
+    //タスク作成画面から戻ってきたときにTableViewを更新させる
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         tableView.reloadData()
